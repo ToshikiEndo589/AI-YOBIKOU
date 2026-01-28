@@ -55,8 +55,8 @@ export function CategoryStackedChart({ studyLogs, referenceBooks = [] }: Categor
     const today = getTodayDate() // 03:00-03:00の区切りで今日を取得
 
     // 表示する日付の範囲を決定
-    let startDate: Date
-    let endDate: Date
+    let startDate = new Date(today)
+    let endDate = new Date(today)
 
     if (selectedPeriodType === 'week') {
       // 直近7日（今日が先頭）

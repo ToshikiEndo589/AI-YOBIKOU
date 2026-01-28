@@ -54,9 +54,10 @@ export function DailyStudyChart({ dailyStudyMinutes }: DailyStudyChartProps) {
           label={{ value: '学習時間(分)', angle: -90, position: 'insideLeft' }}
         />
         <Tooltip
-          formatter={(value: number) => {
-            const hours = Math.floor(value / 60)
-            const minutes = value % 60
+          formatter={(value) => {
+            const numericValue = typeof value === 'number' ? value : 0
+            const hours = Math.floor(numericValue / 60)
+            const minutes = numericValue % 60
             if (hours > 0) {
               return `${hours}時間${minutes}分`
             }

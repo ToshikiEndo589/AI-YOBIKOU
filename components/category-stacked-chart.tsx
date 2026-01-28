@@ -299,19 +299,20 @@ export function CategoryStackedChart({ studyLogs, referenceBooks = [] }: Categor
               }}
             />
             <Tooltip
-              formatter={(value: number, name: string) => {
+              formatter={(value, name) => {
+                const numericValue = typeof value === 'number' ? value : 0
                 // 0または非常に小さい値（0.001時間未満、約0.06秒）のみ非表示
-                if (value === 0 || value < 0.001) return null
-                const totalMinutes = Math.round(value * 60)
+                if (numericValue === 0 || numericValue < 0.001) return null
+                const totalMinutes = Math.round(numericValue * 60)
                 if (totalMinutes === 0) return null
                 const hours = Math.floor(totalMinutes / 60)
                 const mins = totalMinutes % 60
                 if (hours > 0 && mins > 0) {
-                  return [`${hours}時間${mins}分`, name]
+                  return [`${hours}時間${mins}分`, String(name)]
                 } else if (hours > 0) {
-                  return [`${hours}時間`, name]
+                  return [`${hours}時間`, String(name)]
                 } else {
-                  return [`${mins}分`, name]
+                  return [`${mins}分`, String(name)]
                 }
               }}
               labelFormatter={(label) => `日付: ${label}`}

@@ -1,6 +1,6 @@
-# AI予備校 - 受験生向け学習管理Webアプリ
+# まなびリズム
 
-Next.jsのApp RouterとTypeScript、Tailwind CSS、Supabase、shadcn uiを使った受験生向け学習管理Webアプリです。
+Next.jsのApp RouterとTypeScript、Tailwind CSS、Supabase、shadcn uiを使った学習管理アプリです。
 
 ## 機能
 

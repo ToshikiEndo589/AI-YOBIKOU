@@ -126,12 +126,14 @@ export function ReferenceBookChart({
               <Cell key={`cell-${item.name}`} fill={item.color} />
             ))}
           </Pie>
-          <Tooltip
-            formatter={(value) => {
-              const numericValue = typeof value === 'number' ? value : 0
-              return formatTime(numericValue)
-            }}
-          />
+          {!isSmallScreen && (
+            <Tooltip
+              formatter={(value) => {
+                const numericValue = typeof value === 'number' ? value : 0
+                return formatTime(numericValue)
+              }}
+            />
+          )}
         </PieChart>
       </ResponsiveContainer>
 

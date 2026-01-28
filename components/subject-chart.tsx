@@ -75,12 +75,14 @@ export function SubjectChart({ studyLogs }: SubjectChartProps) {
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>
-          <Tooltip
-            formatter={(value) => {
-              const numericValue = typeof value === 'number' ? value : 0
-              return [`${numericValue}時間`, '学習時間']
-            }}
-          />
+          {!isSmallScreen && (
+            <Tooltip
+              formatter={(value) => {
+                const numericValue = typeof value === 'number' ? value : 0
+                return [`${numericValue}時間`, '学習時間']
+              }}
+            />
+          )}
         </PieChart>
       </ResponsiveContainer>
 

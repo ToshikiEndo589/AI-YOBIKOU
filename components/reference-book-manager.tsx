@@ -288,10 +288,24 @@ export function ReferenceBookManager({
             }`}
             onClick={() => onSelect(book.id)}
           >
-            <CardContent className="pt-4">
-              <div className="flex items-start gap-3">
+            <CardContent className="pt-4 relative">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDeleteBook(book.id)
+                }}
+                className="absolute right-2 top-2 h-7 w-7 text-muted-foreground hover:text-red-600"
+                aria-label="参考書を削除"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
                 {book.image_url ? (
-                  <div className="relative w-16 h-16 flex-shrink-0 rounded overflow-hidden">
+                  <div className="relative w-16 h-16 flex-shrink-0 rounded overflow-hidden self-center sm:self-start">
                     <Image
                       src={book.image_url}
                       alt={book.name}
@@ -300,7 +314,7 @@ export function ReferenceBookManager({
                     />
                   </div>
                 ) : (
-                  <div className="w-16 h-16 flex-shrink-0 bg-gray-100 rounded flex items-center justify-center">
+                  <div className="w-16 h-16 flex-shrink-0 bg-gray-100 rounded flex items-center justify-center self-center sm:self-start">
                     {book.type === 'book' ? (
                       <Book className="w-8 h-8 text-gray-400" />
                     ) : (
@@ -309,22 +323,9 @@ export function ReferenceBookManager({
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium text-sm truncate">{book.name}</p>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDeleteBook(book.id)
-                      }}
-                      className="h-7 w-7 text-muted-foreground hover:text-red-600"
-                      aria-label="参考書を削除"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  <p className="font-medium text-sm leading-snug break-words">
+                    {book.name || '教材'}
+                  </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {book.type === 'book' ? '参考書' : '動画授業'}
                   </p>

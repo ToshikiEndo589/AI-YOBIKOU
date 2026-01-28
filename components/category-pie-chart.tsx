@@ -90,10 +90,13 @@ export function CategoryPieChart({ studyLogs }: CategoryPieChartProps) {
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: number, name: string, props: any) => {
-                  const hours = Math.floor(value / 60)
-                  const minutes = value % 60
-                  return [`${hours}時間${minutes}分 (${props.payload.percentage}%)`, name]
+                formatter={(value, name, props) => {
+                  const numericValue = typeof value === 'number' ? value : 0
+                  const hours = Math.floor(numericValue / 60)
+                  const minutes = numericValue % 60
+                  const percentage =
+                    typeof props?.payload?.percentage === 'number' ? props.payload.percentage : 0
+                  return [`${hours}時間${minutes}分 (${percentage}%)`, String(name)]
                 }}
                 contentStyle={{
                   backgroundColor: 'white',

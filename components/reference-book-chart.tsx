@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import type { StudyLog, ReferenceBook } from '@/types/database'
 import { getMaterialColor } from '@/lib/color-utils'
@@ -19,6 +19,16 @@ export function ReferenceBookChart({
   referenceBooks,
   range,
 }: ReferenceBookChartProps) {
+  const [isSmallScreen, setIsSmallScreen] = useState(false)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 640px)')
+    const handleChange = () => setIsSmallScreen(mediaQuery.matches)
+    handleChange()
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
   const data = useMemo(() => {
     const bookMap = new Map<string, { name: string; minutes: number }>()
 
@@ -98,30 +108,49 @@ export function ReferenceBookChart({
   }
 
   return (
-    <ResponsiveContainer width="100%" height={260}>
-      <PieChart>
-        <Pie
-          data={data}
-          dataKey="value"
-          nameKey="name"
-          innerRadius={45}
-          outerRadius={90}
-          paddingAngle={2}
-          label={renderCustomLabel}
-          labelLine={false}
-          isAnimationActive={false}
-        >
-          {data.map((item) => (
-            <Cell key={`cell-${item.name}`} fill={item.color} />
-          ))}
-        </Pie>
-        <Tooltip
-          formatter={(value) => {
-            const numericValue = typeof value === 'number' ? value : 0
-            return formatTime(numericValue)
-          }}
-        />
-      </PieChart>
-    </ResponsiveContainer>
+    <div className="space-y-4">
+      <ResponsiveContainer width="100%" height={240}>
+        <PieChart>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            innerRadius={isSmallScreen ? 35 : 45}
+            outerRadius={isSmallScreen ? 80 : 90}
+            paddingAngle={2}
+            label={isSmallScreen ? undefined : renderCustomLabel}
+            labelLine={false}
+            isAnimationActive={false}
+          >
+            {data.map((item) => (
+              <Cell key={`cell-${item.name}`} fill={item.color} />
+            ))}
+          </Pie>
+          <Tooltip
+            formatter={(value) => {
+              const numericValue = typeof value === 'number' ? value : 0
+              return formatTime(numericValue)
+            }}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+
+      <div className="space-y-2">
+        {data.map((item) => (
+          <div key={item.name} className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div
+                className="w-3 h-3 rounded"
+                style={{ backgroundColor: item.color }}
+              />
+              <span className="text-sm">{item.name}</span>
+            </div>
+            <span className="text-sm font-semibold">
+              {formatTime(item.value)} ({item.percentage}%)
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }

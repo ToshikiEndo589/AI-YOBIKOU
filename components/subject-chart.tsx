@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import type { StudyLog } from '@/types/database'
 
@@ -22,6 +22,16 @@ const COLORS = [
 ]
 
 export function SubjectChart({ studyLogs }: SubjectChartProps) {
+  const [isSmallScreen, setIsSmallScreen] = useState(false)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 640px)')
+    const handleChange = () => setIsSmallScreen(mediaQuery.matches)
+    handleChange()
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
   const data = useMemo(() => {
     const subjectMap = new Map<string, number>()
 
@@ -49,15 +59,15 @@ export function SubjectChart({ studyLogs }: SubjectChartProps) {
 
   return (
     <div className="space-y-4">
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={260}>
         <PieChart>
           <Pie
             data={data}
             cx="50%"
             cy="50%"
             labelLine={false}
-            label={({ name, value }) => `${name}: ${value}h`}
-            outerRadius={80}
+            label={isSmallScreen ? undefined : ({ name, value }) => `${name}: ${value}h`}
+            outerRadius={isSmallScreen ? 70 : 80}
             fill="#8884d8"
             dataKey="value"
           >

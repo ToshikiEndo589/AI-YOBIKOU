@@ -288,7 +288,7 @@ export function ReferenceBookManager({
             }`}
             onClick={() => onSelect(book.id)}
           >
-            <CardContent className="pt-4 relative">
+            <CardContent className="pt-4 relative text-center sm:text-left">
               <Button
                 type="button"
                 variant="ghost"
@@ -303,7 +303,7 @@ export function ReferenceBookManager({
                 <Trash2 className="w-4 h-4" />
               </Button>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
                 {book.image_url ? (
                   <div className="relative w-16 h-16 flex-shrink-0 rounded overflow-hidden self-center sm:self-start">
                     <Image
@@ -322,8 +322,8 @@ export function ReferenceBookManager({
                     )}
                   </div>
                 )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-base leading-snug break-words">
+                <div className="flex-1 min-w-0 sm:mt-0">
+                  <p className="font-semibold text-base leading-snug break-words">
                     {book.name || '教材'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1 hidden sm:block">

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, memo } from 'react'
 import Image from 'next/image'
-import { Send, ImageIcon, Camera, X, User } from 'lucide-react'
+import { Send, ImageIcon, Camera, X, User, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import ReactMarkdown from 'react-markdown'
@@ -17,8 +17,17 @@ interface Message {
   imageUrl?: string
 }
 
-const STORAGE_KEY = 'qa_chat_history'
+const SESSIONS_KEY = 'qa_chat_sessions'
+const ACTIVE_KEY = 'qa_active_chat_id'
+const LEGACY_KEY = 'qa_chat_history'
 const STORAGE_MAX_MESSAGES = 50
+
+interface ChatSession {
+  id: string
+  title: string
+  messages: Message[]
+  updatedAt: number
+}
 
 const MessageBubble = memo(function MessageBubble({
   message,
@@ -175,6 +184,8 @@ const MessageList = memo(function MessageList({
 })
 
 export default function QAPage() {
+  const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -206,19 +217,57 @@ export default function QAPage() {
 
   // ローカルストレージから履歴を読み込む
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved)
-          if (Array.isArray(parsed)) {
-            setMessages(parsed)
-          }
-        } catch (e) {
-          console.error('Failed to load chat history:', e)
+    if (typeof window === 'undefined') return
+    const savedSessions =
+      localStorage.getItem(SESSIONS_KEY) || sessionStorage.getItem(SESSIONS_KEY)
+    const savedActive =
+      localStorage.getItem(ACTIVE_KEY) || sessionStorage.getItem(ACTIVE_KEY)
+    if (savedSessions) {
+      try {
+        const parsed = JSON.parse(savedSessions)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSessions(parsed)
+          const activeId = savedActive || parsed[0].id
+          setActiveChatId(activeId)
+          const active = parsed.find((s: ChatSession) => s.id === activeId) || parsed[0]
+          setMessages(active.messages || [])
+          return
         }
+      } catch (e) {
+        console.error('Failed to load chat sessions:', e)
       }
     }
+
+    const legacy = localStorage.getItem(LEGACY_KEY) || sessionStorage.getItem(LEGACY_KEY)
+    if (legacy) {
+      try {
+        const parsed = JSON.parse(legacy)
+        if (Array.isArray(parsed)) {
+          const legacySession: ChatSession = {
+            id: Date.now().toString(),
+            title: 'チャット 1',
+            messages: parsed,
+            updatedAt: Date.now(),
+          }
+          setSessions([legacySession])
+          setActiveChatId(legacySession.id)
+          setMessages(legacySession.messages)
+          return
+        }
+      } catch (e) {
+        console.error('Failed to migrate legacy chat history:', e)
+      }
+    }
+
+    const initialSession: ChatSession = {
+      id: Date.now().toString(),
+      title: 'チャット 1',
+      messages: [],
+      updatedAt: Date.now(),
+    }
+    setSessions([initialSession])
+    setActiveChatId(initialSession.id)
+    setMessages([])
   }, [])
 
   useEffect(() => {
@@ -244,30 +293,37 @@ export default function QAPage() {
     loadProfile()
   }, [])
 
-  // メッセージが変更されたら保存
+  // メッセージが変更されたらセッションに反映
   useEffect(() => {
-    if (typeof window === 'undefined' || messages.length === 0) return
+    if (typeof window === 'undefined' || !activeChatId) return
 
-    // 画像データは容量が大きいので保存対象から除外
     const lightweight = messages
       .slice(-STORAGE_MAX_MESSAGES)
       .map(({ id, role, content }) => ({ id, role, content }))
 
+    setSessions((prev) =>
+      prev.map((session) =>
+        session.id === activeChatId
+          ? { ...session, messages: lightweight, updatedAt: Date.now() }
+          : session
+      )
+    )
+  }, [messages, activeChatId])
+
+  // セッション全体を保存
+  useEffect(() => {
+    if (typeof window === 'undefined' || sessions.length === 0) return
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(lightweight))
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(lightweight))
-    } catch (e) {
-      // それでも超える場合はさらに件数を減らす
-      try {
-        const smaller = lightweight.slice(-20)
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(smaller))
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(smaller))
-      } catch {
-        // 最終手段：保存を諦める
-        console.warn('Failed to save chat history due to quota.')
+      localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions))
+      sessionStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions))
+      if (activeChatId) {
+        localStorage.setItem(ACTIVE_KEY, activeChatId)
+        sessionStorage.setItem(ACTIVE_KEY, activeChatId)
       }
+    } catch (e) {
+      console.warn('Failed to save chat sessions:', e)
     }
-  }, [messages])
+  }, [sessions, activeChatId])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -352,14 +408,82 @@ export default function QAPage() {
     }
   }
 
+  const handleSelectChat = (id: string) => {
+    setActiveChatId(id)
+    const session = sessions.find((s) => s.id === id)
+    setMessages(session?.messages || [])
+    setInput('')
+    setSelectedImage(null)
+  }
+
+  const handleCreateChat = () => {
+    const nextIndex = sessions.length + 1
+    const newSession: ChatSession = {
+      id: Date.now().toString(),
+      title: `チャット ${nextIndex}`,
+      messages: [],
+      updatedAt: Date.now(),
+    }
+    setSessions((prev) => [newSession, ...prev])
+    setActiveChatId(newSession.id)
+    setMessages([])
+    setInput('')
+    setSelectedImage(null)
+  }
+
+  const handleDeleteChat = () => {
+    if (!activeChatId) return
+    if (!confirm('このチャットを削除しますか？')) return
+    setSessions((prev) => {
+      const remaining = prev.filter((s) => s.id !== activeChatId)
+      const nextSession = remaining[0]
+      if (nextSession) {
+        setActiveChatId(nextSession.id)
+        setMessages(nextSession.messages || [])
+      } else {
+        const fallback: ChatSession = {
+          id: Date.now().toString(),
+          title: 'チャット 1',
+          messages: [],
+          updatedAt: Date.now(),
+        }
+        setActiveChatId(fallback.id)
+        setMessages([])
+        return [fallback]
+      }
+      return remaining
+    })
+  }
+
   return (
     <div className="w-full px-3 pt-4 pb-3 min-h-screen flex flex-col bg-gradient-to-b from-slate-50 via-white to-slate-100">
       <Card className="shadow-xl flex-1 flex flex-col min-h-0 border-0 bg-white/90 backdrop-blur">
         <CardHeader className="flex-shrink-0 pb-3">
-          <CardTitle className="flex items-center gap-2">
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs">AI</span>
-            Q&A
-          </CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs">AI</span>
+              Q&A
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <select
+                value={activeChatId || ''}
+                onChange={(e) => handleSelectChat(e.target.value)}
+                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              >
+                {sessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {session.title}
+                  </option>
+                ))}
+              </select>
+              <Button variant="outline" size="icon" onClick={handleCreateChat} title="新規チャット">
+                <Plus className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="icon" onClick={handleDeleteChat} title="チャット削除">
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* メッセージ表示エリア */}
@@ -371,7 +495,7 @@ export default function QAPage() {
           />
 
           {/* 入力エリア */}
-          <div className="flex gap-2 flex-shrink-0 pt-3 border-t">
+          <div className="flex flex-col gap-2 flex-shrink-0 pt-3 border-t">
             <input
               ref={fileInputRef}
               type="file"
@@ -389,52 +513,59 @@ export default function QAPage() {
               className="hidden"
               id="camera-upload"
             />
-            <label htmlFor="image-upload" className="cursor-pointer">
-              <Button
-                variant="outline"
-                size="icon"
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <ImageIcon className="w-5 h-5" />
-              </Button>
-            </label>
-            <label htmlFor="camera-upload" className="cursor-pointer">
-              <Button
-                variant="outline"
-                size="icon"
-                type="button"
-                onClick={() => cameraInputRef.current?.click()}
-                title="カメラで撮影"
-              >
-                <Camera className="w-5 h-5" />
-              </Button>
-            </label>
-            {selectedImage && (
-              <div className="relative w-12 h-12 flex-shrink-0">
-                <img
-                  src={selectedImage}
-                  alt="プレビュー"
-                  className="w-12 h-12 rounded object-cover"
-                />
+            <div className="flex items-center gap-2">
+              <label htmlFor="image-upload" className="cursor-pointer">
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="icon"
-                  className="absolute -top-1 -right-1 h-5 w-5 p-0"
-                  onClick={() => {
-                    setSelectedImage(null)
-                    if (fileInputRef.current) {
-                      fileInputRef.current.value = ''
-                    }
-                    if (cameraInputRef.current) {
-                      cameraInputRef.current.value = ''
-                    }
-                  }}
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
                 >
-                  <X className="w-3 h-3" />
+                  <ImageIcon className="w-5 h-5" />
+                </Button>
+              </label>
+              <label htmlFor="camera-upload" className="cursor-pointer">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  title="カメラで撮影"
+                >
+                  <Camera className="w-5 h-5" />
+                </Button>
+              </label>
+              {selectedImage && (
+                <div className="relative w-12 h-12 flex-shrink-0">
+                  <img
+                    src={selectedImage}
+                    alt="プレビュー"
+                    className="w-12 h-12 rounded object-cover"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute -top-1 -right-1 h-5 w-5 p-0"
+                    onClick={() => {
+                      setSelectedImage(null)
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = ''
+                      }
+                      if (cameraInputRef.current) {
+                        cameraInputRef.current.value = ''
+                      }
+                    }}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              )}
+              <div className="ml-auto">
+                <Button onClick={handleSend} disabled={!input.trim() && !selectedImage} className="h-10 w-10 p-0 rounded-xl">
+                  <Send className="w-5 h-5" />
                 </Button>
               </div>
-            )}
+            </div>
             <textarea
               ref={textareaRef}
               value={input}
@@ -446,12 +577,9 @@ export default function QAPage() {
                 }
               }}
               placeholder="質問を入力..."
-              className="flex-1 min-h-[96px] max-h-[220px] resize-none overflow-y-auto rounded-xl border border-input bg-background px-3 py-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-              rows={4}
+              className="w-full min-h-[140px] max-h-[260px] resize-none overflow-y-auto rounded-xl border border-input bg-background px-3 py-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+              rows={5}
             />
-            <Button onClick={handleSend} disabled={!input.trim() && !selectedImage} className="h-11 w-11 p-0 rounded-xl">
-              <Send className="w-5 h-5" />
-            </Button>
           </div>
         </CardContent>
       </Card>

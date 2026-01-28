@@ -105,7 +105,7 @@ const MessageList = memo(function MessageList({
 }: {
   messages: Message[]
   isLoading: boolean
-  messagesEndRef: React.RefObject<HTMLDivElement>
+  messagesEndRef: React.RefObject<HTMLDivElement | null>
 }) {
   return (
     <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2" style={{ scrollbarWidth: 'thin' }}>

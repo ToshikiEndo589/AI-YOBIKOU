@@ -24,6 +24,7 @@ export interface Database {
           week_target_date: string | null
           month_target_minutes: number | null
           month_target_date: string | null
+          avatar_url: string | null
           onboarding_completed: boolean
           created_at: string
           updated_at: string
@@ -42,6 +43,7 @@ export interface Database {
           week_target_date?: string | null
           month_target_minutes?: number | null
           month_target_date?: string | null
+          avatar_url?: string | null
           onboarding_completed?: boolean
           created_at?: string
           updated_at?: string
@@ -60,6 +62,7 @@ export interface Database {
           week_target_date?: string | null
           month_target_minutes?: number | null
           month_target_date?: string | null
+          avatar_url?: string | null
           onboarding_completed?: boolean
           created_at?: string
           updated_at?: string

@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   week_target_date DATE,
   month_target_minutes INTEGER,
   month_target_date DATE,
+  avatar_url TEXT,
   onboarding_completed BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -100,7 +101,8 @@ ADD COLUMN IF NOT EXISTS today_target_date DATE,
 ADD COLUMN IF NOT EXISTS week_target_minutes INTEGER,
 ADD COLUMN IF NOT EXISTS week_target_date DATE,
 ADD COLUMN IF NOT EXISTS month_target_minutes INTEGER,
-ADD COLUMN IF NOT EXISTS month_target_date DATE;
+ADD COLUMN IF NOT EXISTS month_target_date DATE,
+ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 
 -- 既存のユーザーにはデフォルトで2026年2月1日を設定（必要に応じて変更）
 UPDATE profiles 

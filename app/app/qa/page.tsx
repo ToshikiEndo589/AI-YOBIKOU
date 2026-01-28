@@ -2,12 +2,13 @@
 
 import { useState, useRef, useEffect, memo } from 'react'
 import Image from 'next/image'
-import { Send, ImageIcon, Camera, X } from 'lucide-react'
+import { Send, ImageIcon, Camera, X, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
+import { createClient } from '@/lib/supabase/client'
 
 interface Message {
   id: string
@@ -19,7 +20,13 @@ interface Message {
 const STORAGE_KEY = 'qa_chat_history'
 const STORAGE_MAX_MESSAGES = 50
 
-const MessageBubble = memo(function MessageBubble({ message }: { message: Message }) {
+const MessageBubble = memo(function MessageBubble({
+  message,
+  userAvatarUrl,
+}: {
+  message: Message
+  userAvatarUrl: string | null
+}) {
   return (
     <div
       className={`flex gap-3 ${
@@ -37,10 +44,10 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: Messag
         </div>
       )}
       <div
-        className={`max-w-[80%] rounded-lg p-3 ${
+        className={`max-w-[82%] rounded-2xl p-3 shadow-sm ${
           message.role === 'user'
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted'
+            ? 'bg-gradient-to-br from-blue-600 to-blue-500 text-primary-foreground'
+            : 'bg-white border border-slate-200'
         }`}
       >
         {message.imageUrl && (
@@ -92,7 +99,20 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: Messag
         )}
       </div>
       {message.role === 'user' && (
-        <div className="w-8 h-8 flex-shrink-0" />
+        <div className="relative w-8 h-8 flex-shrink-0">
+          {userAvatarUrl ? (
+            <Image
+              src={userAvatarUrl}
+              alt="あなた"
+              fill
+              className="object-cover rounded-full"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center">
+              <User className="w-4 h-4 text-slate-500" />
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
@@ -102,10 +122,12 @@ const MessageList = memo(function MessageList({
   messages,
   isLoading,
   messagesEndRef,
+  userAvatarUrl,
 }: {
   messages: Message[]
   isLoading: boolean
   messagesEndRef: React.RefObject<HTMLDivElement | null>
+  userAvatarUrl: string | null
 }) {
   return (
     <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2" style={{ scrollbarWidth: 'thin' }}>
@@ -125,7 +147,7 @@ const MessageList = memo(function MessageList({
       )}
 
       {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} />
+        <MessageBubble key={message.id} message={message} userAvatarUrl={userAvatarUrl} />
       ))}
 
       {isLoading && (
@@ -157,6 +179,8 @@ export default function QAPage() {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null)
+  const [isCoarsePointer, setIsCoarsePointer] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -171,19 +195,53 @@ export default function QAPage() {
   }, [input])
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mediaQuery = window.matchMedia('(pointer: coarse)')
+    const handleChange = () => setIsCoarsePointer(mediaQuery.matches)
+    handleChange()
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
   // ローカルストレージから履歴を読み込む
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(STORAGE_KEY)
+      const saved = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY)
       if (saved) {
         try {
           const parsed = JSON.parse(saved)
-          setMessages(parsed)
+          if (Array.isArray(parsed)) {
+            setMessages(parsed)
+          }
         } catch (e) {
           console.error('Failed to load chat history:', e)
         }
       }
     }
+  }, [])
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const supabase = createClient()
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) return
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('avatar_url')
+          .eq('user_id', user.id)
+          .single()
+        if (profile?.avatar_url) {
+          setUserAvatarUrl(profile.avatar_url)
+        }
+      } catch (error) {
+        console.warn('Failed to load profile avatar:', error)
+      }
+    }
+    loadProfile()
   }, [])
 
   // メッセージが変更されたら保存
@@ -197,11 +255,13 @@ export default function QAPage() {
 
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(lightweight))
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(lightweight))
     } catch (e) {
       // それでも超える場合はさらに件数を減らす
       try {
         const smaller = lightweight.slice(-20)
         localStorage.setItem(STORAGE_KEY, JSON.stringify(smaller))
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(smaller))
       } catch {
         // 最終手段：保存を諦める
         console.warn('Failed to save chat history due to quota.')
@@ -293,10 +353,13 @@ export default function QAPage() {
   }
 
   return (
-    <div className="w-full px-2 pt-3 pb-0 min-h-screen flex flex-col">
-      <Card className="shadow-lg flex-1 flex flex-col min-h-0">
+    <div className="w-full px-3 pt-4 pb-3 min-h-screen flex flex-col bg-gradient-to-b from-slate-50 via-white to-slate-100">
+      <Card className="shadow-xl flex-1 flex flex-col min-h-0 border-0 bg-white/90 backdrop-blur">
         <CardHeader className="flex-shrink-0 pb-3">
-          <CardTitle>AI Q&A</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs">AI</span>
+            Q&A
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* メッセージ表示エリア */}
@@ -304,10 +367,11 @@ export default function QAPage() {
             messages={messages}
             isLoading={isLoading}
             messagesEndRef={messagesEndRef}
+            userAvatarUrl={userAvatarUrl}
           />
 
           {/* 入力エリア */}
-          <div className="flex gap-2 flex-shrink-0 pt-2 border-t">
+          <div className="flex gap-2 flex-shrink-0 pt-3 border-t">
             <input
               ref={fileInputRef}
               type="file"
@@ -376,16 +440,16 @@ export default function QAPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
+                if (e.key === 'Enter' && !e.shiftKey && !isCoarsePointer && !e.nativeEvent.isComposing) {
                   e.preventDefault()
                   handleSend()
                 }
               }}
-              placeholder="質問を入力...（Shift+Enterで改行）"
-              className="flex-1 min-h-[44px] resize-none overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              rows={2}
+              placeholder="質問を入力..."
+              className="flex-1 min-h-[96px] max-h-[220px] resize-none overflow-y-auto rounded-xl border border-input bg-background px-3 py-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+              rows={4}
             />
-            <Button onClick={handleSend} disabled={!input.trim() && !selectedImage}>
+            <Button onClick={handleSend} disabled={!input.trim() && !selectedImage} className="h-11 w-11 p-0 rounded-xl">
               <Send className="w-5 h-5" />
             </Button>
           </div>

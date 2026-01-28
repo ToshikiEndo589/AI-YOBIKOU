@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
+import Image from 'next/image'
+import { User } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,6 +31,9 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
 
   const {
     register,
@@ -67,6 +72,9 @@ export default function SettingsPage() {
             weekday_target_minutes: profile.weekday_target_minutes ?? 60,
             weekend_target_minutes: profile.weekend_target_minutes ?? 120,
           })
+          if (profile.avatar_url) {
+            setAvatarUrl(profile.avatar_url)
+          }
         }
       } catch (err: any) {
         setError(err.message || 'プロフィールの読み込みに失敗しました')
@@ -112,6 +120,59 @@ export default function SettingsPage() {
     }
   }
 
+  const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      alert('画像ファイルを選択してください')
+      return
+    }
+    setIsUploadingAvatar(true)
+    try {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        alert('ログインが必要です')
+        return
+      }
+
+      const fileExt = file.name.split('.').pop() || 'jpg'
+      const filePath = `${user.id}/${Date.now()}.${fileExt}`
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { cacheControl: '3600', upsert: true })
+
+      if (uploadError) {
+        throw uploadError
+      }
+
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath)
+      const publicUrl = urlData.publicUrl
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          avatar_url: publicUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id)
+
+      if (updateError) throw updateError
+
+      setAvatarUrl(publicUrl)
+      alert('アイコンを更新しました')
+    } catch (err: any) {
+      alert(err.message || 'アイコンのアップロードに失敗しました')
+    } finally {
+      setIsUploadingAvatar(false)
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = ''
+      }
+    }
+  }
+
   const handleLogout = async () => {
     try {
       const supabase = createClient()
@@ -149,6 +210,34 @@ export default function SettingsPage() {
                 {error}
               </div>
             )}
+
+            <div className="flex items-center gap-4">
+              <div className="relative w-16 h-16 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center">
+                {avatarUrl ? (
+                  <Image src={avatarUrl} alt="アイコン" fill className="object-cover" />
+                ) : (
+                  <User className="w-7 h-7 text-slate-400" />
+                )}
+              </div>
+              <div className="space-y-2">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarSelect}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                >
+                  {isUploadingAvatar ? 'アップロード中...' : 'アイコンを変更'}
+                </Button>
+                <p className="text-xs text-muted-foreground">正方形の画像がきれいに表示されます</p>
+              </div>
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="weekday_target_minutes">平日の目標学習時間（分）</Label>

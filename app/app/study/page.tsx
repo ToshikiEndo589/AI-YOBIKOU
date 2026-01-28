@@ -372,17 +372,16 @@ export default function StudyPage() {
         </Card>
 
         {/* ストップウォッチ */}
-        <Card className="shadow-lg">
+        <Card className="shadow-xl border-0 bg-gradient-to-br from-slate-900 to-slate-800 text-white">
           <CardHeader>
-            <CardTitle>リアルタイム計測</CardTitle>
-            <CardDescription>学習時間を計測します（アプリを閉じても計測は続きます）</CardDescription>
+            <CardTitle className="text-white">リアルタイム計測</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-center">
-              <div className="text-6xl font-mono font-bold text-primary mb-4">
+              <div className="text-6xl font-mono font-bold text-white mb-4 tracking-widest">
                 {formatTime(seconds)}
               </div>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-slate-300">
                 {selectedBook ? selectedBook.name : '教材を選択してください'}
               </div>
             </div>
@@ -393,7 +392,7 @@ export default function StudyPage() {
                   onClick={handleStart}
                   disabled={!selectedBookId || isSaving}
                   size="lg"
-                  className="flex-1"
+                  className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
                   title={!selectedBookId ? '教材を選択してください' : ''}
                 >
                   <Play className="w-5 h-5 mr-2" />
@@ -403,18 +402,16 @@ export default function StudyPage() {
                 <>
                   <Button
                     onClick={handlePause}
-                    variant="outline"
                     size="lg"
-                    className="flex-1"
+                    className="flex-1 bg-white/10 hover:bg-white/20 text-white border border-white/20"
                   >
                     <Pause className="w-5 h-5 mr-2" />
                     一時停止
                   </Button>
                   <Button
                     onClick={handleStop}
-                    variant="destructive"
                     size="lg"
-                    className="flex-1"
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white"
                     disabled={isSaving}
                   >
                     <Square className="w-5 h-5 mr-2" />

@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   school_name TEXT,
   current_deviation NUMERIC(4, 1),
   target_deviation NUMERIC(4, 1),
+  avatar_url TEXT,
   onboarding_completed BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -100,6 +101,10 @@ CREATE INDEX IF NOT EXISTS idx_study_logs_started_at ON study_logs(started_at DE
 5. 「Run」ボタンをクリックして実行
 
 6. 実行が成功したら、「Success. No rows returned」というメッセージが表示されます
+
+## 画像アップロード（アイコン）
+
+アイコンを使う場合は、Supabase Storageに `avatars` バケットを作成してください。
 
 ## 確認方法
 

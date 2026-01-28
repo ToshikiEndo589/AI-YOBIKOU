@@ -66,7 +66,10 @@ export function SubjectChart({ studyLogs }: SubjectChartProps) {
             ))}
           </Pie>
           <Tooltip
-            formatter={(value: number) => [`${value}時間`, '学習時間']}
+            formatter={(value) => {
+              const numericValue = typeof value === 'number' ? value : 0
+              return [`${numericValue}時間`, '学習時間']
+            }}
           />
         </PieChart>
       </ResponsiveContainer>

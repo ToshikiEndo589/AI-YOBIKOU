@@ -459,31 +459,10 @@ export default function QAPage() {
     <div className="w-full px-3 pt-4 pb-3 min-h-screen flex flex-col bg-gradient-to-b from-slate-50 via-white to-slate-100">
       <Card className="shadow-xl flex-1 flex flex-col min-h-0 border-0 bg-white/90 backdrop-blur">
         <CardHeader className="flex-shrink-0 pb-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="flex items-center gap-2">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs">AI</span>
-              Q&A
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <select
-                value={activeChatId || ''}
-                onChange={(e) => handleSelectChat(e.target.value)}
-                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-              >
-                {sessions.map((session) => (
-                  <option key={session.id} value={session.id}>
-                    {session.title}
-                  </option>
-                ))}
-              </select>
-              <Button variant="outline" size="icon" onClick={handleCreateChat} title="新規チャット">
-                <Plus className="w-4 h-4" />
-              </Button>
-              <Button variant="outline" size="icon" onClick={handleDeleteChat} title="チャット削除">
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs">AI</span>
+            Q&A
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* メッセージ表示エリア */}
@@ -513,7 +492,7 @@ export default function QAPage() {
               className="hidden"
               id="camera-upload"
             />
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <label htmlFor="image-upload" className="cursor-pointer">
                 <Button
                   variant="outline"
@@ -535,6 +514,23 @@ export default function QAPage() {
                   <Camera className="w-5 h-5" />
                 </Button>
               </label>
+              <select
+                value={activeChatId || ''}
+                onChange={(e) => handleSelectChat(e.target.value)}
+                className="h-9 rounded-md border border-input bg-background px-2 text-xs"
+              >
+                {sessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {session.title}
+                  </option>
+                ))}
+              </select>
+              <Button variant="outline" size="icon" onClick={handleCreateChat} title="新規チャット">
+                <Plus className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="icon" onClick={handleDeleteChat} title="チャット削除">
+                <Trash2 className="w-4 h-4" />
+              </Button>
               {selectedImage && (
                 <div className="relative w-12 h-12 flex-shrink-0">
                   <img

@@ -277,7 +277,7 @@ export function ReferenceBookManager({
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {referenceBooks.map((book) => (
           <Card
             key={book.id}
@@ -323,10 +323,10 @@ export function ReferenceBookManager({
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm leading-snug break-words">
+                  <p className="font-medium text-base leading-snug break-words">
                     {book.name || '教材'}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground mt-1 hidden sm:block">
                     {book.type === 'book' ? '参考書' : '動画授業'}
                   </p>
                 </div>

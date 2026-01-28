@@ -116,8 +116,9 @@ export function ReferenceBookChart({
           ))}
         </Pie>
         <Tooltip
-          formatter={(value: number) => {
-            return formatTime(value)
+          formatter={(value) => {
+            const numericValue = typeof value === 'number' ? value : 0
+            return formatTime(numericValue)
           }}
         />
       </PieChart>

@@ -46,9 +46,10 @@ export function Heatmap({ studyLogs }: HeatmapProps) {
     return 4
   }
 
+  type HeatmapDay = (typeof heatmapData)[number]
   // 週ごとにグループ化
-  const weeks: typeof heatmapData[][] = []
-  let currentWeek: typeof heatmapData = []
+  const weeks: HeatmapDay[][] = []
+  let currentWeek: HeatmapDay[] = []
   heatmapData.forEach((day, index) => {
     if (index % 7 === 0 && currentWeek.length > 0) {
       weeks.push(currentWeek)

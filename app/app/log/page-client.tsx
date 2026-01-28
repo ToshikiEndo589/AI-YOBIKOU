@@ -36,6 +36,7 @@ export function LogPageClient() {
   const [manualMinutes, setManualMinutes] = useState('')
   const [manualDate, setManualDate] = useState(getLocalDateString())
   const [isSaving, setIsSaving] = useState(false)
+  const [materialRangeType, setMaterialRangeType] = useState<'day' | 'week' | 'month' | 'total'>('day')
   const [dailyIndex, setDailyIndex] = useState(0)
   const [weeklyIndex, setWeeklyIndex] = useState(0)
   const [monthlyIndex, setMonthlyIndex] = useState(0)
@@ -678,83 +679,74 @@ export function LogPageClient() {
                   </div>
                 )
               })()}
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <div className="w-full rounded-lg border border-muted bg-white p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="text-xs text-muted-foreground">一日</span>
+              <div className="w-full rounded-lg border border-muted bg-white p-3">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">表示期間</span>
                     <select
-                      value={dailyIndex}
-                      onChange={(e) => setDailyIndex(Number(e.target.value))}
+                      value={materialRangeType}
+                      onChange={(e) =>
+                        setMaterialRangeType(e.target.value as 'day' | 'week' | 'month' | 'total')
+                      }
                       className="h-7 rounded-md border border-input bg-background px-2 text-xs"
                     >
-                      {Array.from({ length: 8 }, (_, i) => i).map((value) => (
-                        <option key={value} value={value}>
-                          {getDayLabel(value)}
-                        </option>
-                      ))}
+                      <option value="day">一日</option>
+                      <option value="week">1週間</option>
+                      <option value="month">1ヶ月</option>
+                      <option value="total">総累計</option>
                     </select>
                   </div>
-                  <ReferenceBookChart
-                    studyLogs={studyLogs}
-                    referenceBooks={referenceBooks}
-                    range={getDayRange(dailyIndex)}
-                  />
-                </div>
-
-                <div className="w-full rounded-lg border border-muted bg-white p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="text-xs text-muted-foreground">1週間</span>
+                  {materialRangeType !== 'total' && (
                     <select
-                      value={weeklyIndex}
-                      onChange={(e) => setWeeklyIndex(Number(e.target.value))}
+                      value={
+                        materialRangeType === 'day'
+                          ? dailyIndex
+                          : materialRangeType === 'week'
+                            ? weeklyIndex
+                            : monthlyIndex
+                      }
+                      onChange={(e) => {
+                        const value = Number(e.target.value)
+                        if (materialRangeType === 'day') setDailyIndex(value)
+                        if (materialRangeType === 'week') setWeeklyIndex(value)
+                        if (materialRangeType === 'month') setMonthlyIndex(value)
+                      }}
                       className="h-7 rounded-md border border-input bg-background px-2 text-xs"
                     >
-                      {Array.from({ length: 6 }, (_, i) => i).map((value) => (
-                        <option key={value} value={value}>
-                          {value === 0 ? '今週' : `${value}週間前`}
-                        </option>
-                      ))}
+                      {materialRangeType === 'day' &&
+                        Array.from({ length: 8 }, (_, i) => i).map((value) => (
+                          <option key={value} value={value}>
+                            {getDayLabel(value)}
+                          </option>
+                        ))}
+                      {materialRangeType === 'week' &&
+                        Array.from({ length: 6 }, (_, i) => i).map((value) => (
+                          <option key={value} value={value}>
+                            {value === 0 ? '今週' : `${value}週間前`}
+                          </option>
+                        ))}
+                      {materialRangeType === 'month' &&
+                        Array.from({ length: 13 }, (_, i) => i).map((value) => (
+                          <option key={value} value={value}>
+                            {value === 0 ? '今月' : `${value}ヶ月前`}
+                          </option>
+                        ))}
                     </select>
-                  </div>
-                  <ReferenceBookChart
-                    studyLogs={studyLogs}
-                    referenceBooks={referenceBooks}
-                    range={getWeekRangeFromIndex(weeklyIndex)}
-                  />
+                  )}
                 </div>
-
-                <div className="w-full rounded-lg border border-muted bg-white p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="text-xs text-muted-foreground">1ヶ月</span>
-                    <select
-                      value={monthlyIndex}
-                      onChange={(e) => setMonthlyIndex(Number(e.target.value))}
-                      className="h-7 rounded-md border border-input bg-background px-2 text-xs"
-                    >
-                      {Array.from({ length: 13 }, (_, i) => i).map((value) => (
-                        <option key={value} value={value}>
-                          {value === 0 ? '今月' : `${value}ヶ月前`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <ReferenceBookChart
-                    studyLogs={studyLogs}
-                    referenceBooks={referenceBooks}
-                    range={getMonthRangeFromIndex(monthlyIndex)}
-                  />
-                </div>
-
-                <div className="w-full rounded-lg border border-muted bg-white p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="text-xs text-muted-foreground">総累計</span>
-                    <span className="text-xs text-muted-foreground">全期間</span>
-                  </div>
-                  <ReferenceBookChart
-                    studyLogs={studyLogs}
-                    referenceBooks={referenceBooks}
-                  />
-                </div>
+                <ReferenceBookChart
+                  studyLogs={studyLogs}
+                  referenceBooks={referenceBooks}
+                  range={
+                    materialRangeType === 'day'
+                      ? getDayRange(dailyIndex)
+                      : materialRangeType === 'week'
+                        ? getWeekRangeFromIndex(weeklyIndex)
+                        : materialRangeType === 'month'
+                          ? getMonthRangeFromIndex(monthlyIndex)
+                          : undefined
+                  }
+                />
               </div>
             </div>
           </CardContent>

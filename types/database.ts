@@ -76,6 +76,7 @@ export interface Database {
           reference_book_id: string | null
           study_minutes: number
           started_at: string
+          note: string | null
           created_at: string
         }
         Insert: {
@@ -85,6 +86,7 @@ export interface Database {
           reference_book_id?: string | null
           study_minutes: number
           started_at: string
+          note?: string | null
           created_at?: string
         }
         Update: {
@@ -94,6 +96,68 @@ export interface Database {
           reference_book_id?: string | null
           study_minutes?: number
           started_at?: string
+          note?: string | null
+          created_at?: string
+        }
+      }
+      review_tasks: {
+        Row: {
+          id: string
+          user_id: string
+          study_log_id: string
+          due_at: string
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          study_log_id: string
+          due_at: string
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          study_log_id?: string
+          due_at?: string
+          status?: string
+          created_at?: string
+        }
+      }
+      quiz_attempts: {
+        Row: {
+          id: string
+          user_id: string
+          review_task_id: string
+          question: string
+          choices: string[]
+          correct_index: number
+          selected_index: number
+          is_correct: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          review_task_id: string
+          question: string
+          choices: string[]
+          correct_index: number
+          selected_index: number
+          is_correct: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          review_task_id?: string
+          question?: string
+          choices?: string[]
+          correct_index?: number
+          selected_index?: number
+          is_correct?: boolean
           created_at?: string
         }
       }

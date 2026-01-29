@@ -1,8 +1,37 @@
 /**
  * 日付判定のユーティリティ
- * 一日の区切りを03:00-03:00で管理
+ * 一日の区切りを03:00-03:00で管理（JST固定）
  */
-import { format } from 'date-fns'
+
+const JST_OFFSET_MS = 9 * 60 * 60 * 1000
+const STUDY_DAY_START_HOUR = 3
+const STUDY_DAY_SHIFT_MS = (9 - STUDY_DAY_START_HOUR) * 60 * 60 * 1000
+
+const formatYmdUTC = (date: Date): string => {
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const getJstParts = (date: Date) => {
+  const shifted = new Date(date.getTime() + JST_OFFSET_MS)
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+    day: shifted.getUTCDate(),
+  }
+}
+
+const getStudyDayStart = (date: Date): Date => {
+  const [year, month, day] = getStudyDay(date).split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day, STUDY_DAY_START_HOUR) - JST_OFFSET_MS)
+}
+
+export function getStudyDayDate(studyDay: string): Date {
+  const [year, month, day] = studyDay.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1, day) - JST_OFFSET_MS)
+}
 
 /**
  * 指定された日時がどの「日」に属するかを判定
@@ -11,16 +40,8 @@ import { format } from 'date-fns'
  * @returns その日時が属する「日」の日付（yyyy-MM-dd形式）
  */
 export function getStudyDay(date: Date): string {
-  const hour = date.getHours()
-  const studyDate = new Date(date)
-
-  // 03:00より前（深夜0時〜2時59分）なら前日として扱う
-  // 例: 1月26日 02:00 → 1月25日の学習記録として扱う
-  if (hour < 3) {
-    studyDate.setDate(studyDate.getDate() - 1)
-  }
-
-  return format(studyDate, 'yyyy-MM-dd')
+  const shifted = new Date(date.getTime() + STUDY_DAY_SHIFT_MS)
+  return formatYmdUTC(shifted)
 }
 
 /**
@@ -34,9 +55,9 @@ export function getStudyDay(date: Date): string {
  * @returns その日付に対応する学習記録の日付（yyyy-MM-dd形式）
  */
 export function getStudyDayFromCalendarDate(calendarDate: Date): string {
-  // カレンダーの日付をそのまま学習記録の日付として使う
-  // 例：カレンダーの1月25日 → 1月25日の学習記録（1月25日 03:00 〜 1月26日 02:59）
-  return format(calendarDate, 'yyyy-MM-dd')
+  // カレンダーの日付をそのまま学習記録の日付として使う（JST基準）
+  const shifted = new Date(calendarDate.getTime() + JST_OFFSET_MS)
+  return formatYmdUTC(shifted)
 }
 
 /**
@@ -44,31 +65,15 @@ export function getStudyDayFromCalendarDate(calendarDate: Date): string {
  * @returns 現在の「日」の日付（Dateオブジェクト、時刻は00:00:00）
  */
 export function getTodayDate(): Date {
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  
-  // 現在が03:00より前なら、前日を今日として扱う
-  if (now.getHours() < 3) {
-    today.setDate(today.getDate() - 1)
-  }
-  
-  return today
+  const { year, month, day } = getJstParts(new Date())
+  return new Date(Date.UTC(year, month - 1, day) - JST_OFFSET_MS)
 }
 
 /**
  * 今日の開始時刻（03:00）を取得
  */
 export function getTodayStart(): Date {
-  const now = new Date()
-  const todayStart = new Date(now)
-  todayStart.setHours(3, 0, 0, 0)
-
-  // 現在が03:00より前なら、昨日の03:00を返す
-  if (now.getHours() < 3) {
-    todayStart.setDate(todayStart.getDate() - 1)
-  }
-
-  return todayStart
+  return getStudyDayStart(new Date())
 }
 
 /**
@@ -76,12 +81,12 @@ export function getTodayStart(): Date {
  */
 export function getThisWeekStart(): Date {
   const todayStart = getTodayStart()
-  const dayOfWeek = todayStart.getDay() // 0=日曜, 1=月曜, ...
+  const { year, month, day } = getJstParts(todayStart)
+  const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay() // 0=日曜, 1=月曜, ...
   const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
 
   const weekStart = new Date(todayStart)
-  weekStart.setDate(weekStart.getDate() - daysToMonday)
-  weekStart.setHours(3, 0, 0, 0)
+  weekStart.setUTCDate(weekStart.getUTCDate() - daysToMonday)
 
   return weekStart
 }
@@ -91,26 +96,23 @@ export function getThisWeekStart(): Date {
  */
 export function getThisMonthStart(): Date {
   const todayStart = getTodayStart()
-  const monthStart = new Date(todayStart)
-  monthStart.setDate(1)
-  monthStart.setHours(3, 0, 0, 0)
-
-  return monthStart
+  const { year, month } = getJstParts(todayStart)
+  return new Date(Date.UTC(year, month - 1, 1, STUDY_DAY_START_HOUR) - JST_OFFSET_MS)
 }
 
 /**
  * 指定された週の開始日（月曜日）を取得
  * @param offset 週のオフセット（0=今週、-1=先週、-2=2週間前など）
- * @returns その週の月曜日のDateオブジェクト（時刻は00:00:00）
+ * @returns その週の月曜日のDateオブジェクト（時刻は03:00:00）
  */
 export function getWeekStart(offset: number = 0): Date {
   const todayStart = getTodayStart()
-  const dayOfWeek = todayStart.getDay() // 0=日曜, 1=月曜, ...
+  const { year, month, day } = getJstParts(todayStart)
+  const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay() // 0=日曜, 1=月曜, ...
   const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
 
   const weekStart = new Date(todayStart)
-  weekStart.setDate(weekStart.getDate() - daysToMonday - (offset * 7))
-  weekStart.setHours(0, 0, 0, 0)
+  weekStart.setUTCDate(weekStart.getUTCDate() - daysToMonday - (offset * 7))
 
   return weekStart
 }
@@ -118,14 +120,12 @@ export function getWeekStart(offset: number = 0): Date {
 /**
  * 指定された月の開始日を取得
  * @param offset 月のオフセット（0=今月、-1=先月、-2=2ヶ月前など）
- * @returns その月の1日のDateオブジェクト（時刻は00:00:00）
+ * @returns その月の1日のDateオブジェクト（時刻は03:00:00）
  */
 export function getMonthStart(offset: number = 0): Date {
   const todayStart = getTodayStart()
-  const monthStart = new Date(todayStart.getFullYear(), todayStart.getMonth() + offset, 1)
-  monthStart.setHours(0, 0, 0, 0)
-
-  return monthStart
+  const { year, month } = getJstParts(todayStart)
+  return new Date(Date.UTC(year, month - 1 + offset, 1, STUDY_DAY_START_HOUR) - JST_OFFSET_MS)
 }
 
 /**

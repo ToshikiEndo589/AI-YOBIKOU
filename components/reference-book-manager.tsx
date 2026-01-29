@@ -277,7 +277,7 @@ export function ReferenceBookManager({
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {referenceBooks.map((book) => (
           <Card
             key={book.id}
@@ -288,7 +288,7 @@ export function ReferenceBookManager({
             }`}
             onClick={() => onSelect(book.id)}
           >
-            <CardContent className="pt-4 relative text-center sm:text-left">
+            <CardContent className="pt-3 pb-3 relative flex flex-col items-center text-center sm:items-start sm:text-left">
               <Button
                 type="button"
                 variant="ghost"
@@ -303,9 +303,9 @@ export function ReferenceBookManager({
                 <Trash2 className="w-4 h-4" />
               </Button>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+              <div className="flex flex-col items-center gap-2 sm:items-start">
                 {book.image_url ? (
-                  <div className="relative w-16 h-16 flex-shrink-0 rounded overflow-hidden self-center sm:self-start">
+                  <div className="relative w-14 h-14 flex-shrink-0 rounded overflow-hidden">
                     <Image
                       src={book.image_url}
                       alt={book.name}
@@ -314,7 +314,7 @@ export function ReferenceBookManager({
                     />
                   </div>
                 ) : (
-                  <div className="w-16 h-16 flex-shrink-0 bg-gray-100 rounded flex items-center justify-center self-center sm:self-start">
+                  <div className="w-14 h-14 flex-shrink-0 bg-gray-100 rounded flex items-center justify-center">
                     {book.type === 'book' ? (
                       <Book className="w-8 h-8 text-gray-400" />
                     ) : (
@@ -322,8 +322,8 @@ export function ReferenceBookManager({
                     )}
                   </div>
                 )}
-                <div className="flex-1 min-w-0 sm:mt-0">
-                  <p className="font-semibold text-base leading-snug break-words">
+                <div className="w-full">
+                  <p className="font-semibold text-sm leading-snug break-words">
                     {book.name || '教材'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1 hidden sm:block">

@@ -107,7 +107,7 @@ export default function LoginPage() {
             <CardDescription className="text-center">
               {isSignUp
                 ? 'アカウントを作成して学習を始めましょう'
-                : 'AI予備校へようこそ'}
+                : 'まなびリズムへようこそ'}
             </CardDescription>
           </CardHeader>
           <CardContent>

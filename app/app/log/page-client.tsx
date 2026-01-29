@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { CategoryStackedChart } from '@/components/category-stacked-chart'
-import { ReferenceBookChart } from '@/components/reference-book-chart'
-import { getTodayStart, getThisMonthStart, getWeekStart, getMonthStart, isInPeriod, getThisWeekStart } from '@/lib/date-utils'
+import { getTodayStart, getThisMonthStart, getWeekStart, getMonthStart, isInPeriod, getStudyDay, getStudyDayDate } from '@/lib/date-utils'
 import { getMaterialColor } from '@/lib/color-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +12,24 @@ import { Label } from '@/components/ui/label'
 import { Plus, Share2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { StudyLog, ReferenceBook, Profile } from '@/types/database'
+
+const CategoryStackedChart = dynamic(
+  () => import('@/components/category-stacked-chart').then((mod) => mod.CategoryStackedChart),
+  {
+    ssr: false,
+    loading: () => <div className="text-sm text-muted-foreground">グラフを読み込み中...</div>,
+  }
+)
+
+const ReferenceBookChart = dynamic(
+  () => import('@/components/reference-book-chart').then((mod) => mod.ReferenceBookChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="text-center py-6 text-muted-foreground">グラフを読み込み中...</div>
+    ),
+  }
+)
 
 export function LogPageClient() {
   const getLocalDateString = () => {
@@ -35,6 +52,8 @@ export function LogPageClient() {
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null)
   const [manualMinutes, setManualMinutes] = useState('')
   const [manualDate, setManualDate] = useState(getLocalDateString())
+  const [manualNotes, setManualNotes] = useState<string[]>([''])
+  const [attachNoteToExisting, setAttachNoteToExisting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [materialRangeType, setMaterialRangeType] = useState<'day' | 'week' | 'month' | 'total'>('day')
   const [dailyIndex, setDailyIndex] = useState(0)
@@ -47,7 +66,10 @@ export function LogPageClient() {
   const [editSubject, setEditSubject] = useState('')
   const [editMinutes, setEditMinutes] = useState('')
   const [editDate, setEditDate] = useState(getLocalDateString())
+  const [editNote, setEditNote] = useState('')
   const [showEditLogs, setShowEditLogs] = useState(false)
+  const [showMemoLogs, setShowMemoLogs] = useState(false)
+  const [editingGroupIds, setEditingGroupIds] = useState<string[]>([])
 
   useEffect(() => {
     const loadData = async () => {
@@ -214,6 +236,50 @@ export function LogPageClient() {
   const monthRange = getMonthRangeFromIndex(monthOffset)
   const monthMinutes = getMinutesInRange(monthRange.start, monthRange.end)
 
+  const logsWithNotes = studyLogs.filter((log) => log.note && log.note.trim().length > 0)
+  const groupedEditLogs = (() => {
+    const groups = new Map<
+      string,
+      {
+        ids: string[]
+        subject: string
+        reference_book_id: string | null
+        started_at: string
+        study_minutes: number
+        note: string | null
+        studyDay: string
+      }
+    >()
+
+    studyLogs.forEach((log) => {
+      const studyDay = getStudyDay(new Date(log.started_at))
+      const keyBase = log.reference_book_id ? `book:${log.reference_book_id}` : `subject:${log.subject}`
+      const key = `${studyDay}::${keyBase}`
+      const existing = groups.get(key)
+      if (!existing) {
+        groups.set(key, {
+          ids: [log.id],
+          subject: log.subject,
+          reference_book_id: log.reference_book_id || null,
+          started_at: log.started_at,
+          study_minutes: log.study_minutes,
+          note: log.note || null,
+          studyDay,
+        })
+      } else {
+        existing.ids.push(log.id)
+        existing.study_minutes += log.study_minutes
+        if (log.note && log.note.trim()) {
+          existing.note = existing.note
+            ? `${existing.note}\n\n${log.note.trim()}`
+            : log.note.trim()
+        }
+      }
+    })
+
+    return Array.from(groups.values())
+  })()
+
   const handleToggleManualInput = () => {
     if (!showManualInput) {
       setManualDate(getLocalDateString())
@@ -238,10 +304,31 @@ export function LogPageClient() {
 
   const startEditLog = (log: StudyLog) => {
     setEditingLogId(log.id)
+    setEditingGroupIds([log.id])
     setEditBookId(log.reference_book_id || null)
     setEditSubject(log.subject)
     setEditMinutes(String(log.study_minutes))
     setEditDate(toLocalDateInput(log.started_at))
+    setEditNote(log.note || '')
+  }
+
+  const startEditGroup = (group: {
+    ids: string[]
+    subject: string
+    reference_book_id: string | null
+    started_at: string
+    study_minutes: number
+    note: string | null
+    studyDay: string
+  }) => {
+    const representativeId = group.ids[0]
+    setEditingLogId(representativeId)
+    setEditingGroupIds(group.ids)
+    setEditBookId(group.reference_book_id || null)
+    setEditSubject(group.subject)
+    setEditMinutes(String(group.study_minutes))
+    setEditDate(group.studyDay)
+    setEditNote(group.note || '')
   }
 
   const cancelEditLog = () => {
@@ -250,6 +337,51 @@ export function LogPageClient() {
     setEditSubject('')
     setEditMinutes('')
     setEditDate(getLocalDateString())
+    setEditNote('')
+    setEditingGroupIds([])
+  }
+
+  const getManualNoteValue = () => {
+    return manualNotes
+      .map((note) => note.trim())
+      .filter(Boolean)
+      .map((note) => `・${note}`)
+      .join('\n')
+  }
+
+  const ensureReviewTasks = async (
+    supabase: ReturnType<typeof createClient>,
+    userId: string,
+    studyLogId: string,
+    startedAt: string,
+    note: string
+  ) => {
+    if (!note.trim()) return
+    const { data: existing } = await supabase
+      .from('review_tasks')
+      .select('id')
+      .eq('study_log_id', studyLogId)
+      .limit(1)
+
+    if (existing && existing.length > 0) return
+
+    const baseDate = new Date(startedAt)
+    baseDate.setHours(12, 0, 0, 0)
+    const reviewDays = [1, 3, 7, 14, 30]
+    const tasks = reviewDays.map((days) => {
+      const due = new Date(baseDate)
+      due.setDate(due.getDate() + days)
+      return {
+        user_id: userId,
+        study_log_id: studyLogId,
+        due_at: due.toISOString(),
+        status: 'pending',
+      }
+    })
+    const { error } = await supabase.from('review_tasks').insert(tasks)
+    if (error) {
+      console.warn('Failed to create review tasks:', error)
+    }
   }
 
   const saveEditLog = async () => {
@@ -267,6 +399,17 @@ export function LogPageClient() {
 
     try {
       const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        alert('ログインが必要です')
+        return
+      }
+
+      const noteValue = editNote.trim() || null
+
       const { data: updated, error } = await supabase
         .from('study_logs')
         .update({
@@ -274,11 +417,27 @@ export function LogPageClient() {
           reference_book_id: editBookId || null,
           study_minutes: minutes,
           started_at: startedAt,
+          note: noteValue,
         })
         .eq('id', editingLogId)
         .select()
 
       if (error) throw error
+
+      await ensureReviewTasks(supabase, user.id, editingLogId, startedAt, editNote)
+
+      if (editingGroupIds.length > 1) {
+        const idsToDelete = editingGroupIds.filter((id) => id !== editingLogId)
+        if (idsToDelete.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('study_logs')
+            .delete()
+            .in('id', idsToDelete)
+          if (deleteError) {
+            console.warn('Failed to delete merged logs:', deleteError)
+          }
+        }
+      }
 
       // 最新のデータを再取得
       const { data: logsData } = await supabase
@@ -305,6 +464,31 @@ export function LogPageClient() {
         .from('study_logs')
         .delete()
         .eq('id', logId)
+
+      if (error) throw error
+
+      const { data: logsData } = await supabase
+        .from('study_logs')
+        .select('*')
+        .order('started_at', { ascending: false })
+
+      if (logsData) {
+        applyLogs(logsData)
+      }
+    } catch (err: any) {
+      console.error('Delete study log error:', err)
+      alert(err.message || '削除に失敗しました。もう一度お試しください。')
+    }
+  }
+
+  const deleteLogGroup = async (logIds: string[]) => {
+    if (!confirm('この学習記録を削除しますか？')) return
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('study_logs')
+        .delete()
+        .in('id', logIds)
 
       if (error) throw error
 
@@ -452,15 +636,25 @@ export function LogPageClient() {
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedBookId || !manualMinutes || !manualDate) {
-      alert('すべての項目を入力してください')
-      return
-    }
-
-    const minutes = parseInt(manualMinutes)
-    if (isNaN(minutes) || minutes < 1) {
-      alert('1分以上の学習時間を入力してください')
-      return
+    if (attachNoteToExisting) {
+      if (!manualDate) {
+        alert('日付を入力してください')
+        return
+      }
+      const noteValue = getManualNoteValue()
+      if (!noteValue) {
+        alert('勉強内容を入力してください')
+        return
+      }
+    } else {
+      if (!selectedBookId || !manualDate) {
+        alert('教材と日付を入力してください')
+        return
+      }
+      if (!manualMinutes) {
+        alert('学習時間を入力してください')
+        return
+      }
     }
 
     setIsSaving(true)
@@ -475,6 +669,53 @@ export function LogPageClient() {
         return
       }
 
+      if (attachNoteToExisting) {
+        const dateStart = new Date(manualDate)
+        dateStart.setHours(3, 0, 0, 0)
+        const dateEnd = new Date(dateStart)
+        dateEnd.setDate(dateEnd.getDate() + 1)
+
+        let query = supabase
+          .from('study_logs')
+          .select('id, note, started_at')
+          .eq('user_id', user.id)
+          .gte('started_at', dateStart.toISOString())
+          .lt('started_at', dateEnd.toISOString())
+          .order('started_at', { ascending: false })
+          .limit(1)
+
+        if (selectedBookId) {
+          query = query.eq('reference_book_id', selectedBookId)
+        }
+
+        const { data: existingLogs, error: existingError } = await query
+
+        if (existingError) throw existingError
+
+        const existing = existingLogs?.[0]
+        if (!existing) {
+          alert('指定した日の学習記録が見つかりませんでした。時間を入力して新規で保存してください。')
+          return
+        }
+
+        const noteValue = getManualNoteValue()
+        const newNote = existing.note ? `${existing.note}\n\n${noteValue}` : noteValue
+
+        const { error: updateError } = await supabase
+          .from('study_logs')
+          .update({ note: newNote })
+          .eq('id', existing.id)
+
+        if (updateError) throw updateError
+
+        await ensureReviewTasks(supabase, user.id, existing.id, existing.started_at, noteValue)
+      } else {
+        const minutes = parseInt(manualMinutes)
+        if (isNaN(minutes) || minutes < 1) {
+          alert('1分以上の学習時間を入力してください')
+          return
+        }
+
       const selectedBook = referenceBooks.find((b) => b.id === selectedBookId)
       const subject = selectedBook?.name?.trim() || 'その他'
 
@@ -487,7 +728,8 @@ export function LogPageClient() {
       inputDate.setHours(12, 0, 0, 0)
       const startedAt = inputDate.toISOString()
 
-      const { data, error } = await supabase
+        const noteValue = getManualNoteValue() || null
+        const { data, error } = await supabase
         .from('study_logs')
         .insert({
           user_id: user.id,
@@ -495,6 +737,7 @@ export function LogPageClient() {
           reference_book_id: selectedBookId || null,
           study_minutes: minutes,
           started_at: startedAt,
+          note: noteValue,
         })
         .select()
         .single()
@@ -519,11 +762,18 @@ export function LogPageClient() {
         applyLogs(logsData)
       }
 
+        if (noteValue) {
+          await ensureReviewTasks(supabase, user.id, data.id, startedAt, noteValue)
+        }
+      }
+
       // フォームをリセット
       setManualMinutes('')
       setManualDate(getLocalDateString())
+      setManualNotes([''])
+      setAttachNoteToExisting(false)
       setShowManualInput(false)
-      alert('学習記録を保存しました！')
+      alert(attachNoteToExisting ? 'メモを追加しました！' : '学習記録を保存しました！')
     } catch (err: any) {
       console.error('Save study log error:', err)
       alert(err.message || '保存に失敗しました。もう一度お試しください。')
@@ -587,7 +837,7 @@ export function LogPageClient() {
             <div className="grid grid-cols-2 gap-2">
               <div className="bg-gray-100 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-muted-foreground">{getWeekLabel(weekOffset)}（月ー日）</span>
+                  <span className="text-xs text-muted-foreground">{getWeekLabel(weekOffset)}</span>
                   <select
                     value={weekOffset}
                     onChange={(e) => setWeekOffset(Number(e.target.value))}
@@ -752,13 +1002,13 @@ export function LogPageClient() {
           </CardContent>
         </Card>
 
-        {/* 過去の学習記録入力 */}
+        {/* 学習記録の入力 */}
         <Card className="shadow-lg border-0 bg-white">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-base font-semibold">過去の学習記録</CardTitle>
-                <CardDescription>過去の学習時間を手動で入力</CardDescription>
+                <CardTitle className="text-base font-semibold">学習記録の入力</CardTitle>
+                <CardDescription>今日や過去の学習内容をまとめて入力できます</CardDescription>
               </div>
               <Button
                 variant="outline"
@@ -779,7 +1029,7 @@ export function LogPageClient() {
                     value={selectedBookId || ''}
                     onChange={(e) => setSelectedBookId(e.target.value || null)}
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    required
+                    required={!attachNoteToExisting}
                   >
                     <option value="">選択してください</option>
                     {referenceBooks.map((book) => (
@@ -799,7 +1049,8 @@ export function LogPageClient() {
                     value={manualMinutes}
                     onChange={(e) => setManualMinutes(e.target.value)}
                     placeholder="60"
-                    required
+                    required={!attachNoteToExisting}
+                    disabled={attachNoteToExisting}
                   />
                 </div>
 
@@ -814,10 +1065,113 @@ export function LogPageClient() {
                   />
                 </div>
 
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={attachNoteToExisting}
+                    onChange={(e) => setAttachNoteToExisting(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  計測済みの記録にメモを追加（時間入力不要）
+                </label>
+                {attachNoteToExisting && (
+                  <p className="text-xs text-muted-foreground">
+                    教材を選ばない場合は、その日の最新記録に追加します
+                  </p>
+                )}
+
+                <div className="space-y-2">
+                  <Label>勉強内容</Label>
+                  <p className="text-xs text-muted-foreground">
+                    1つの内容ごとに分けると、復習カードが作りやすくなります
+                  </p>
+                  <div className="space-y-2">
+                    {manualNotes.map((note, index) => (
+                      <div key={`manual-note-${index}`} className="flex items-start gap-2">
+                        <textarea
+                          value={note}
+                          onChange={(e) => {
+                            const next = [...manualNotes]
+                            next[index] = e.target.value
+                            setManualNotes(next)
+                          }}
+                          placeholder="例: 二次関数の最大最小"
+                          className="w-full min-h-[70px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          rows={2}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const next = manualNotes.filter((_, i) => i !== index)
+                            setManualNotes(next.length > 0 ? next : [''])
+                          }}
+                        >
+                          削除
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setManualNotes([...manualNotes, ''])}
+                    >
+                      内容を追加
+                    </Button>
+                  </div>
+                </div>
+
                 <Button type="submit" className="w-full" disabled={isSaving}>
-                  {isSaving ? '保存中...' : '保存'}
+                  {isSaving ? '送信中...' : '送信'}
                 </Button>
               </form>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* 学習内容メモ */}
+        <Card className="shadow-lg border-0 bg-white">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-semibold">学習内容メモ</CardTitle>
+                <CardDescription>入力した内容をあとから見返せます</CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowMemoLogs(!showMemoLogs)}
+              >
+                <Plus className={cn('w-5 h-5 transition-transform', showMemoLogs && 'rotate-45')} />
+              </Button>
+            </div>
+          </CardHeader>
+          {showMemoLogs && (
+            <CardContent className="space-y-3">
+              {logsWithNotes.length === 0 && (
+                <p className="text-sm text-muted-foreground">まだメモがありません</p>
+              )}
+              {logsWithNotes.length > 0 && (
+                <div className="max-h-[360px] overflow-y-auto space-y-3 pr-1">
+                  {logsWithNotes.map((log) => (
+                    <div key={`note-${log.id}`} className="rounded-lg border border-muted p-3 space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-sm text-muted-foreground">
+                          {new Date(log.started_at).toLocaleDateString('ja-JP')}
+                        </div>
+                        <div className="text-sm font-medium">
+                          {log.subject} / {formatTime(log.study_minutes)}
+                        </div>
+                      </div>
+                      <div className="text-sm text-foreground whitespace-pre-wrap">
+                        {log.note}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           )}
         </Card>
@@ -841,12 +1195,12 @@ export function LogPageClient() {
           </CardHeader>
           {showEditLogs && (
             <CardContent className="space-y-3">
-              {studyLogs.length === 0 && (
+              {groupedEditLogs.length === 0 && (
                 <p className="text-sm text-muted-foreground">学習記録がありません</p>
               )}
-              {studyLogs.slice(0, 20).map((log) => (
-                <div key={log.id} className="rounded-lg border border-muted p-3">
-                  {editingLogId === log.id ? (
+              {groupedEditLogs.slice(0, 20).map((group) => (
+                <div key={`group-${group.studyDay}-${group.subject}-${group.reference_book_id || 'none'}`} className="rounded-lg border border-muted p-3">
+                  {editingLogId && group.ids.includes(editingLogId) ? (
                     <div className="space-y-3">
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                         <div className="space-y-1">
@@ -898,27 +1252,45 @@ export function LogPageClient() {
                           <Button variant="outline" onClick={cancelEditLog}>
                             キャンセル
                           </Button>
-                          <Button variant="destructive" onClick={() => deleteLog(log.id)}>
+                          <Button variant="destructive" onClick={() => deleteLogGroup(group.ids)}>
                             削除
                           </Button>
                         </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>勉強内容</Label>
+                        <p className="text-xs text-muted-foreground">
+                          復習カードで使うので、できるだけ具体的に書いてください
+                        </p>
+                        <textarea
+                          value={editNote}
+                          onChange={(e) => setEditNote(e.target.value)}
+                          placeholder="例: 二次関数の最大最小、合成関数の範囲／英語長文の段落要約"
+                          className="w-full min-h-[90px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          rows={3}
+                        />
                       </div>
                     </div>
                   ) : (
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="space-y-1">
                         <div className="text-sm text-muted-foreground">
-                          {new Date(log.started_at).toLocaleDateString('ja-JP')}
+                          {getStudyDayDate(group.studyDay).toLocaleDateString('ja-JP')}
                         </div>
                         <div className="font-medium">
-                          {log.subject} / {formatTime(log.study_minutes)}
+                          {group.subject} / {formatTime(group.study_minutes)}
                         </div>
+                        {group.note && (
+                          <div className="text-sm text-muted-foreground whitespace-pre-wrap">
+                            {group.note}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => startEditLog(log)}>
+                        <Button variant="outline" size="sm" onClick={() => startEditGroup(group)}>
                           編集
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={() => deleteLog(log.id)}>
+                        <Button variant="destructive" size="sm" onClick={() => deleteLogGroup(group.ids)}>
                           削除
                         </Button>
                       </div>

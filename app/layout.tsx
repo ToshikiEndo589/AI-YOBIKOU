@@ -18,8 +18,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI予備校 - 受験生向け学習管理アプリ",
+  title: "まなびリズム",
+  applicationName: "まなびリズム",
   description: "学習記録を可視化して、危機感とモチベーションを管理する学習管理アプリ",
+  icons: {
+    icon: "/images/mascot.png",
+    apple: "/images/mascot.png",
+  },
 };
 
 export default function RootLayout({

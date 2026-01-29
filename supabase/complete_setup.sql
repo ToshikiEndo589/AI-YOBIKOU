@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   week_target_date DATE,
   month_target_minutes INTEGER,
   month_target_date DATE,
+  avatar_url TEXT,
   onboarding_completed BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -26,6 +27,7 @@ CREATE TABLE IF NOT EXISTS study_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   subject TEXT NOT NULL,
+  note TEXT,
   study_minutes INTEGER NOT NULL,
   started_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -34,6 +36,32 @@ CREATE TABLE IF NOT EXISTS study_logs (
 -- RLS (Row Level Security) の有効化
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE study_logs ENABLE ROW LEVEL SECURITY;
+
+-- review_tasksテーブルの作成（復習タスク）
+CREATE TABLE IF NOT EXISTS review_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  study_log_id UUID NOT NULL REFERENCES study_logs(id) ON DELETE CASCADE,
+  due_at TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- quiz_attemptsテーブルの作成（復習クイズ結果）
+CREATE TABLE IF NOT EXISTS quiz_attempts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  review_task_id UUID NOT NULL REFERENCES review_tasks(id) ON DELETE CASCADE,
+  question TEXT NOT NULL,
+  choices TEXT[] NOT NULL,
+  correct_index INTEGER NOT NULL,
+  selected_index INTEGER NOT NULL,
+  is_correct BOOLEAN NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE review_tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quiz_attempts ENABLE ROW LEVEL SECURITY;
 
 -- profilesテーブルのRLSポリシー
 CREATE POLICY "Users can view own profile"
@@ -64,6 +92,32 @@ CREATE POLICY "Users can update own study logs"
 CREATE POLICY "Users can delete own study logs"
   ON study_logs FOR DELETE
   USING (auth.uid() = user_id);
+
+-- review_tasksテーブルのRLSポリシー
+CREATE POLICY "Users can view own review tasks"
+  ON review_tasks FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own review tasks"
+  ON review_tasks FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own review tasks"
+  ON review_tasks FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own review tasks"
+  ON review_tasks FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- quiz_attemptsテーブルのRLSポリシー
+CREATE POLICY "Users can view own quiz attempts"
+  ON quiz_attempts FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own quiz attempts"
+  ON quiz_attempts FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
 
 -- updated_atを自動更新する関数
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -97,7 +151,8 @@ ALTER TABLE profiles
 ADD COLUMN IF NOT EXISTS week_target_minutes INTEGER,
 ADD COLUMN IF NOT EXISTS week_target_date DATE,
 ADD COLUMN IF NOT EXISTS month_target_minutes INTEGER,
-ADD COLUMN IF NOT EXISTS month_target_date DATE;
+ADD COLUMN IF NOT EXISTS month_target_date DATE,
+ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 
 -- 既存のユーザーにはデフォルトで2026年2月1日を設定
 UPDATE profiles 

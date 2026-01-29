@@ -1,5 +1,6 @@
 import type { StudyLog } from '@/types/database'
-import { format, isSameDay, differenceInDays } from 'date-fns'
+import { differenceInDays } from 'date-fns'
+import { getStudyDay, getStudyDayDate } from '@/lib/date-utils'
 
 /**
  * ストリーク（連続学習日数）を計算
@@ -14,16 +15,13 @@ export function calculateStreak(studyLogs: StudyLog[]): {
   }
 
   // 日付ごとにグループ化
-  const dates = new Set(
-    studyLogs.map((log) => format(new Date(log.started_at), 'yyyy-MM-dd'))
-  )
+  const dates = new Set(studyLogs.map((log) => getStudyDay(new Date(log.started_at))))
   const sortedDates = Array.from(dates)
-    .map((d) => new Date(d))
+    .map((d) => getStudyDayDate(d))
     .sort((a, b) => b.getTime() - a.getTime())
 
-  const today = new Date()
-  const todayStr = format(today, 'yyyy-MM-dd')
-  const yesterdayStr = format(new Date(today.getTime() - 24 * 60 * 60 * 1000), 'yyyy-MM-dd')
+  const todayStr = getStudyDay(new Date())
+  const yesterdayStr = getStudyDay(new Date(getStudyDayDate(todayStr).getTime() - 24 * 60 * 60 * 1000))
 
   // 現在のストリークを計算
   let currentStreak = 0
@@ -31,10 +29,10 @@ export function calculateStreak(studyLogs: StudyLog[]): {
   let lastStudyDate: Date | null = null
 
   for (const logDate of sortedDates) {
-    const logDateStr = format(logDate, 'yyyy-MM-dd')
-    const checkDateStr = format(checkDate, 'yyyy-MM-dd')
+    const logDateStr = getStudyDay(logDate)
+    const checkDateStr = getStudyDay(checkDate)
 
-    if (logDateStr === checkDateStr || logDateStr === format(new Date(checkDate.getTime() - 24 * 60 * 60 * 1000), 'yyyy-MM-dd')) {
+    if (logDateStr === checkDateStr || logDateStr === getStudyDay(new Date(checkDate.getTime() - 24 * 60 * 60 * 1000))) {
       currentStreak++
       if (lastStudyDate === null) {
         lastStudyDate = logDate
@@ -128,10 +126,9 @@ export function getTodayMission(
   current: number
   completed: boolean
 } {
-  const today = new Date()
-  const todayStr = format(today, 'yyyy-MM-dd')
+  const todayStr = getStudyDay(new Date())
   const todayMinutes = studyLogs
-    .filter((log) => format(new Date(log.started_at), 'yyyy-MM-dd') === todayStr)
+    .filter((log) => getStudyDay(new Date(log.started_at)) === todayStr)
     .reduce((sum, log) => sum + log.study_minutes, 0)
 
   // ストリーク維持ミッション

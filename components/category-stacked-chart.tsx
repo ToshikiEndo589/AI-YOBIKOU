@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { format } from 'date-fns'
+import { ja } from 'date-fns/locale'
 import { getStudyDay, getTodayDate } from '@/lib/date-utils'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { StudyLog, ReferenceBook } from '@/types/database'
@@ -24,7 +25,7 @@ export function CategoryStackedChart({ studyLogs, referenceBooks = [] }: Categor
   const [dateOffset, setDateOffset] = useState(0) // 日付のオフセット（クリックでシフト）
   const todayLabel = format(getTodayDate(), 'M/d')
 
-  const { chartData, categories, maxValue } = useMemo(() => {
+  const { chartData, categories, maxValue, weekdayMap } = useMemo(() => {
     // 教材名の一覧を取得（reference_book_idがある場合はそのname、ない場合はsubject）
     const materialSet = new Set<string>()
     studyLogs.forEach((log) => {
@@ -42,14 +43,14 @@ export function CategoryStackedChart({ studyLogs, referenceBooks = [] }: Categor
     const categoryList = Array.from(materialSet).sort()
 
     if (studyLogs.length === 0) {
-      return { chartData: [], categories: categoryList, maxValue: 0 }
+      return { chartData: [], categories: categoryList, maxValue: 0, weekdayMap: new Map<string, string>() }
     }
 
     const logDates = studyLogs.map((log) => getStudyDay(new Date(log.started_at)))
     const uniqueDates = Array.from(new Set(logDates)).sort()
 
     if (uniqueDates.length === 0) {
-      return { chartData: [], categories: categoryList, maxValue: 0 }
+      return { chartData: [], categories: categoryList, maxValue: 0, weekdayMap: new Map<string, string>() }
     }
 
     const today = getTodayDate() // 03:00-03:00の区切りで今日を取得
@@ -127,7 +128,13 @@ export function CategoryStackedChart({ studyLogs, referenceBooks = [] }: Categor
     ).filter((v) => v > 0)
     const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0
 
-    return { chartData: result, categories: categoryList, maxValue }
+    const weekdayMap = new Map<string, string>()
+    result.forEach(({ date, fullDate }) => {
+      const dateObj = new Date(`${fullDate}T12:00:00`)
+      weekdayMap.set(date, format(dateObj, 'EEE', { locale: ja }))
+    })
+
+    return { chartData: result, categories: categoryList, maxValue, weekdayMap }
   }, [studyLogs, selectedPeriodType, dateOffset])
 
   // 期間ラベルを生成
@@ -263,7 +270,16 @@ export function CategoryStackedChart({ studyLogs, referenceBooks = [] }: Categor
               tick={{ fontSize: 10, fill: '#6b7280' }}
               axisLine={false}
               tickLine={false}
-              tickFormatter={(label: string) => (label === todayLabel ? '今日' : label)}
+              tickFormatter={(label: string) => {
+                if (selectedPeriodType !== 'week') {
+                  return label === todayLabel ? '今日' : label
+                }
+                const weekday = weekdayMap.get(label) || ''
+                if (label === todayLabel) {
+                  return weekday ? `今日(${weekday})` : '今日'
+                }
+                return weekday ? `${label}(${weekday})` : label
+              }}
               reversed
               angle={selectedPeriodType === 'month' ? -45 : 0}
               textAnchor={selectedPeriodType === 'month' ? 'end' : 'middle'}

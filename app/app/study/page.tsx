@@ -338,12 +338,16 @@ export default function StudyPage() {
         } else {
           const { data: tasksData } = await supabase
             .from('review_tasks')
-            .select('id, due_at, status, study_log_id, study_logs(note, subject)')
+            .select('id, due_at, status, study_log_id, study_logs(note, subject, started_at)')
             .eq('user_id', user.id)
             .eq('status', 'pending')
             .lte('due_at', new Date().toISOString())
             .order('due_at', { ascending: true })
-          setReviewTasks((tasksData as ReviewTask[]) || [])
+          const normalizedTasks = ((tasksData as any[]) || []).map((task) => ({
+            ...task,
+            study_logs: Array.isArray(task.study_logs) ? task.study_logs[0] ?? null : task.study_logs ?? null,
+          })) as ReviewTask[]
+          setReviewTasks(normalizedTasks)
         }
       }
 

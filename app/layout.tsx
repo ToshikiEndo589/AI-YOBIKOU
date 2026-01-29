@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "まなびリズム",
-  applicationName: "まなびリズム",
+  title: "まなびAI",
+  applicationName: "まなびAI",
   description: "学習記録を可視化して、危機感とモチベーションを管理する学習管理アプリ",
   icons: {
     icon: "/images/mascot.png",

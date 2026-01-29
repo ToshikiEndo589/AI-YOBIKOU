@@ -91,7 +91,11 @@ export default function StudyPage() {
         if (error) throw error
         if (tasksError) throw tasksError
         setReferenceBooks(data || [])
-        setReviewTasks((tasksData as ReviewTask[]) || [])
+        const normalizedTasks = ((tasksData as any[]) || []).map((task) => ({
+          ...task,
+          study_logs: Array.isArray(task.study_logs) ? task.study_logs[0] ?? null : task.study_logs ?? null,
+        })) as ReviewTask[]
+        setReviewTasks(normalizedTasks)
       } catch (error: any) {
         console.error('Failed to load reference books:', error)
       } finally {

@@ -283,7 +283,6 @@ export function CategoryStackedChart({ studyLogs, referenceBooks = [] }: Categor
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 10, fill: '#6b7280' }}
               axisLine={false}
               tickLine={false}
               tick={selectedPeriodType === 'week' ? <WeekTick /> : { fontSize: 10, fill: '#6b7280' }}

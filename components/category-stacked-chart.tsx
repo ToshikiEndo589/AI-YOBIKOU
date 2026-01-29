@@ -137,6 +137,22 @@ export function CategoryStackedChart({ studyLogs, referenceBooks = [] }: Categor
     return { chartData: result, categories: categoryList, maxValue, weekdayMap }
   }, [studyLogs, selectedPeriodType, dateOffset])
 
+  const WeekTick = ({ x, y, payload }: { x?: number; y?: number; payload?: { value?: string } }) => {
+    const label = payload?.value || ''
+    const weekday = weekdayMap.get(label) || ''
+    const isToday = label === todayLabel
+    const dateText = isToday ? '今日' : label
+    if (x === undefined || y === undefined) return null
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text textAnchor="middle" fill="#6b7280" fontSize={10}>
+          <tspan x="0" dy="0">{dateText}</tspan>
+          <tspan x="0" dy="12">{weekday}</tspan>
+        </text>
+      </g>
+    )
+  }
+
   // 期間ラベルを生成
   const getPeriodLabel = (): string => {
     if (selectedPeriodType === 'week') {
@@ -270,20 +286,16 @@ export function CategoryStackedChart({ studyLogs, referenceBooks = [] }: Categor
               tick={{ fontSize: 10, fill: '#6b7280' }}
               axisLine={false}
               tickLine={false}
-              tickFormatter={(label: string) => {
-                if (selectedPeriodType !== 'week') {
-                  return label === todayLabel ? '今日' : label
-                }
-                const weekday = weekdayMap.get(label) || ''
-                if (label === todayLabel) {
-                  return weekday ? `今日(${weekday})` : '今日'
-                }
-                return weekday ? `${label}(${weekday})` : label
-              }}
+              tick={selectedPeriodType === 'week' ? <WeekTick /> : { fontSize: 10, fill: '#6b7280' }}
+              tickFormatter={
+                selectedPeriodType === 'week'
+                  ? undefined
+                  : (label: string) => (label === todayLabel ? '今日' : label)
+              }
               reversed
               angle={selectedPeriodType === 'month' ? -45 : 0}
               textAnchor={selectedPeriodType === 'month' ? 'end' : 'middle'}
-              height={selectedPeriodType === 'month' ? 60 : 30}
+              height={selectedPeriodType === 'month' ? 60 : 36}
               interval={selectedPeriodType === 'month' ? 2 : 0}
             />
             <YAxis

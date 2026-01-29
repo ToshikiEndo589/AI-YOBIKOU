@@ -25,7 +25,7 @@ export function calculateStreak(studyLogs: StudyLog[]): {
 
   // 現在のストリークを計算
   let currentStreak = 0
-  let checkDate = new Date(today)
+  let checkDate = getStudyDayDate(todayStr)
   let lastStudyDate: Date | null = null
 
   for (const logDate of sortedDates) {
